@@ -34,7 +34,19 @@ def get_cookies():
     time.sleep(1)
     
     run_cmd('browser-use keys "Enter"')
-    time.sleep(8)
+    
+    # === ASPETTA IL REDIRECT (LA CHIAVE!) ===
+    print("⏳ Attesa redirect alla dashboard...")
+    for i in range(30):
+        time.sleep(1)
+        result = run_cmd_capture("browser-use eval 'window.location.href'")
+        if "/surf/" in result.stdout:
+            print(f"✅ Redirect rilevato! URL: {result.stdout.strip()}")
+            break
+        print(f"   Tentativo {i+1}/30 - URL attuale: {result.stdout.strip()[:80]}")
+    
+    # Attesa aggiuntiva per sicurezza
+    time.sleep(3)
     
     # Estrazione cookie
     result = run_cmd_capture("browser-use cookies get")
