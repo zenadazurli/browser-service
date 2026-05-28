@@ -3,61 +3,66 @@ import asyncio
 import logging
 import sys
 import os
-from browser_use import Browser
+from playwright.async_api import async_playwright
 
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-# Imposta la API key
-os.environ["BROWSER_USE_API_KEY"] = "bu_MN6wlSbFKdRNKvxB349PKTYLjrHGjXGEt3DHrT91cD0"
+PROXY = {
+    "server": "http://resi.fusionproxy.net:13822",
+    "username": "sazz16014w96",
+    "password": "t3vz152mql23"
+}
 
 async def get_cookies_async():
-    logger.info("🚀 Avvio Browser Use SDK...")
-
-    # Browser in modalità cloud
-    browser = Browser(
-        use_cloud=True,
-        headless=True,
-        proxy_country_code="it"
-    )
-
-    # CORREZIONE: usa new_page() invece di get_page()
-    page = await browser.new_page()
-
-    logger.info("🌐 Navigazione...")
-    await page.goto("https://www.easyhits4u.com/logon/", wait_until="domcontentloaded")
-    await page.wait_for_timeout(3000)
-
-    # Chiudi overlay
-    logger.info("🔧 Rimozione overlay...")
-    await page.evaluate("""
-        document.querySelectorAll('.ReactModal__Overlay, .modal-overlay').forEach(el => {
-            el.style.display = 'none';
-        });
-    """)
-
-    logger.info("📝 Compilazione form...")
-    await page.fill('input[name="username"]', "sandrominori50+ulugarecexisa@gmail.com")
-    await page.fill('input[name="password"]', "DDnmVV45!!")
-
-    logger.info("🔑 Click login...")
-    await page.click('button.btn_green', force=True)
-
-    logger.info("⏳ Attesa redirect...")
-    await page.wait_for_url(lambda url: "surf" in url, timeout=30000)
-    logger.info(f"✅ URL finale: {page.url}")
-
-    logger.info("🍪 Estrazione cookie...")
-    cookies = await page.context.cookies()
-    await browser.close()
-
-    sesids = next((c['value'] for c in cookies if c['name'] == 'sesids'), None)
-    user_id = next((c['value'] for c in cookies if c['name'] == 'user_id'), None)
-
-    logger.info(f"🎉 Cookie: sesids={sesids}, user_id={user_id}")
-    return {"sesids": sesids, "user_id": user_id}
+    logger.info("🚀 Avvio Playwright...")
+    
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=['--no-sandbox', '--disable-setuid-sandbox']
+        )
+        
+        # Crea contesto con proxy
+        context = await browser.new_context(proxy=PROXY)
+        page = await context.new_page()
+        
+        logger.info("🌐 Navigazione...")
+        await page.goto("https://www.easyhits4u.com/logon/", wait_until="domcontentloaded")
+        await page.wait_for_timeout(3000)
+        
+        # Chiudi overlay
+        await page.evaluate("""
+            document.querySelectorAll('.ReactModal__Overlay, .modal-overlay').forEach(el => {
+                el.style.display = 'none';
+            });
+        """)
+        
+        logger.info("📝 Compilazione form...")
+        await page.fill('input[name="username"]', "sandrominori50+ulugarecexisa@gmail.com")
+        await page.fill('input[name="password"]', "DDnmVV45!!")
+        
+        logger.info("🔑 Click login...")
+        await page.click('button.btn_green', force=True)
+        
+        logger.info("⏳ Attesa redirect...")
+        for i in range(30):
+            await page.wait_for_timeout(1000)
+            if "surf" in page.url:
+                logger.info(f"✅ Redirect rilevato! URL: {page.url}")
+                break
+        
+        logger.info("🍪 Estrazione cookie...")
+        cookies = await context.cookies()
+        await browser.close()
+        
+        sesids = next((c['value'] for c in cookies if c['name'] == 'sesids'), None)
+        user_id = next((c['value'] for c in cookies if c['name'] == 'user_id'), None)
+        
+        logger.info(f"🎉 Cookie: sesids={sesids}, user_id={user_id}")
+        return {"sesids": sesids, "user_id": user_id}
 
 @app.get("/cookies")
 async def get_cookies():
