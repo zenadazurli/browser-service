@@ -17,11 +17,8 @@ def run_cmd_capture(cmd):
 def get_cookies():
     print("🔐 Login su EasyHits4U via Browser Use Cloud...")
     
-    # Connessione al cloud
     run_cmd(f"browser-use cloud login {API_KEY}")
     run_cmd("browser-use cloud connect")
-    
-    # Navigazione e login
     run_cmd("browser-use open https://www.easyhits4u.com/logon/")
     time.sleep(3)
     
@@ -33,22 +30,26 @@ def get_cookies():
     run_cmd('browser-use type "DDnmVV45!!"')
     time.sleep(1)
     
+    # Primo tentativo
     run_cmd('browser-use keys "Enter"')
+    time.sleep(5)
     
-    # === ASPETTA IL REDIRECT (LA CHIAVE!) ===
-    print("⏳ Attesa redirect alla dashboard...")
+    # === SECONDO TENTATIVO (LA CHIAVE!) ===
+    result = run_cmd_capture("browser-use eval 'window.location.href'")
+    if "warning" in result.stdout:
+        print("⚠️ Rilevato ?warning=il, secondo tentativo...")
+        run_cmd('browser-use keys "Enter"')  # Riprova
+        time.sleep(8)
+    
+    # Attesa redirect
     for i in range(30):
         time.sleep(1)
         result = run_cmd_capture("browser-use eval 'window.location.href'")
         if "/surf/" in result.stdout:
-            print(f"✅ Redirect rilevato! URL: {result.stdout.strip()}")
+            print(f"✅ Redirect rilevato!")
             break
-        print(f"   Tentativo {i+1}/30 - URL attuale: {result.stdout.strip()[:80]}")
     
-    # Attesa aggiuntiva per sicurezza
-    time.sleep(3)
-    
-    # Estrazione cookie
+    # Cookie
     result = run_cmd_capture("browser-use cookies get")
     
     sesids_match = re.search(r"'sesids': '([^']+)'", result.stdout)
