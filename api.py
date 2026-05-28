@@ -15,21 +15,21 @@ os.environ["BROWSER_USE_API_KEY"] = "bu_MN6wlSbFKdRNKvxB349PKTYLjrHGjXGEt3DHrT91
 
 async def get_cookies_async():
     logger.info("🚀 Avvio Browser Use SDK...")
-    
+
     # Browser in modalità cloud
     browser = Browser(
         use_cloud=True,
         headless=True,
         proxy_country_code="it"
     )
-    
+
     # CORREZIONE: usa new_page() invece di get_page()
     page = await browser.new_page()
-    
+
     logger.info("🌐 Navigazione...")
     await page.goto("https://www.easyhits4u.com/logon/", wait_until="domcontentloaded")
     await page.wait_for_timeout(3000)
-    
+
     # Chiudi overlay
     logger.info("🔧 Rimozione overlay...")
     await page.evaluate("""
@@ -37,25 +37,25 @@ async def get_cookies_async():
             el.style.display = 'none';
         });
     """)
-    
+
     logger.info("📝 Compilazione form...")
     await page.fill('input[name="username"]', "sandrominori50+ulugarecexisa@gmail.com")
     await page.fill('input[name="password"]', "DDnmVV45!!")
-    
+
     logger.info("🔑 Click login...")
     await page.click('button.btn_green', force=True)
-    
+
     logger.info("⏳ Attesa redirect...")
     await page.wait_for_url(lambda url: "surf" in url, timeout=30000)
     logger.info(f"✅ URL finale: {page.url}")
-    
+
     logger.info("🍪 Estrazione cookie...")
     cookies = await page.context.cookies()
     await browser.close()
-    
+
     sesids = next((c['value'] for c in cookies if c['name'] == 'sesids'), None)
     user_id = next((c['value'] for c in cookies if c['name'] == 'user_id'), None)
-    
+
     logger.info(f"🎉 Cookie: sesids={sesids}, user_id={user_id}")
     return {"sesids": sesids, "user_id": user_id}
 
