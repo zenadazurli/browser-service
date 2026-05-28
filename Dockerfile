@@ -1,10 +1,7 @@
 FROM python:3.11-slim
 
-# Installa solo l'essenziale (Playwright non serve più per il cloud)
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    && rm -rf /var/lib/apt/lists/*
+# Installa uv (che include uvx)
+RUN pip install uv
 
 WORKDIR /app
 
