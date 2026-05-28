@@ -1,68 +1,73 @@
 from fastapi import FastAPI
+from browser_use import Agent, Browser
+from langchain_openai import ChatOpenAI
 import asyncio
 import logging
-import sys
 import os
-from playwright.async_api import async_playwright
+import json
 
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-PROXY = {
-    "server": "http://resi.fusionproxy.net:13822",
-    "username": "sazz16014w96",
-    "password": "t3vz152mql23"
-}
+# Chiavi (impostate come variabili d'ambiente su Render)
+os.environ["BROWSER_USE_API_KEY"] = "bu_MN6wlSbFKdRNKvxB349PKTYLjrHGjXGEt3DHrT91cD0"
+# La tua chiave OpenAI (inseriscila qui o come variabile d'ambiente)
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "sk-la-tua-chiave")
 
 async def get_cookies_async():
-    logger.info("🚀 Avvio Playwright...")
+    logger.info("🚀 Avvio agente Browser Use Cloud...")
     
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            args=['--no-sandbox', '--disable-setuid-sandbox']
-        )
-        
-        # Crea contesto con proxy
-        context = await browser.new_context(proxy=PROXY)
-        page = await context.new_page()
-        
-        logger.info("🌐 Navigazione...")
-        await page.goto("https://www.easyhits4u.com/logon/", wait_until="domcontentloaded")
-        await page.wait_for_timeout(3000)
-        
-        # Chiudi overlay
-        await page.evaluate("""
-            document.querySelectorAll('.ReactModal__Overlay, .modal-overlay').forEach(el => {
-                el.style.display = 'none';
-            });
-        """)
-        
-        logger.info("📝 Compilazione form...")
-        await page.fill('input[name="username"]', "sandrominori50+ulugarecexisa@gmail.com")
-        await page.fill('input[name="password"]', "DDnmVV45!!")
-        
-        logger.info("🔑 Click login...")
-        await page.click('button.btn_green', force=True)
-        
-        logger.info("⏳ Attesa redirect...")
-        for i in range(30):
-            await page.wait_for_timeout(1000)
-            if "surf" in page.url:
-                logger.info(f"✅ Redirect rilevato! URL: {page.url}")
-                break
-        
-        logger.info("🍪 Estrazione cookie...")
-        cookies = await context.cookies()
-        await browser.close()
-        
-        sesids = next((c['value'] for c in cookies if c['name'] == 'sesids'), None)
-        user_id = next((c['value'] for c in cookies if c['name'] == 'user_id'), None)
-        
-        logger.info(f"🎉 Cookie: sesids={sesids}, user_id={user_id}")
-        return {"sesids": sesids, "user_id": user_id}
+    # Browser in modalità cloud (proxy + stealth automatici)
+    browser = Browser(
+        use_cloud=True,
+        proxy_country_code="it"
+    )
+    
+    # LLM per l'agente
+    llm = ChatOpenAI(
+        model="gpt-4o-mini",
+        api_key=OPENAI_API_KEY,
+        temperature=0.0
+    )
+    
+    # Agente con task dettagliato
+    agent = Agent(
+        task="""
+        1. Vai su https://www.easyhits4u.com/logon/
+        2. Aspetta che la pagina sia caricata
+        3. Inserisci l'email: sandrominori50+ulugarecexisa@gmail.com
+        4. Inserisci la password: DDnmVV45!!
+        5. Clicca sul pulsante di login
+        6. Aspetta che l'URL diventi https://www.easyhits4u.com/surf/
+        7. Estrai i cookie 'sesids' e 'user_id' dalla pagina
+        8. Restituiscili in formato JSON
+        """,
+        llm=llm,
+        browser=browser,
+    )
+    
+    # Esegui l'agente
+    result = await agent.run()
+    
+    # Estrai il risultato finale
+    final_result = result.final_result() if hasattr(result, 'final_result') else str(result)
+    logger.info(f"Risultato agente: {final_result}")
+    
+    # Tenta di parsare come JSON
+    try:
+        # Se il risultato è una stringa JSON
+        if isinstance(final_result, str):
+            data = json.loads(final_result)
+        else:
+            data = final_result
+    except:
+        # Altrimenti restituisci così com'è
+        data = {"raw_result": final_result}
+    
+    await browser.close()
+    return data
 
 @app.get("/cookies")
 async def get_cookies():
