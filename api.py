@@ -23,11 +23,20 @@ async def get_cookies_async():
         proxy_country_code="it"
     )
     
-    page = await browser.get_page()
+    # CORREZIONE: usa new_page() invece di get_page()
+    page = await browser.new_page()
     
     logger.info("🌐 Navigazione...")
     await page.goto("https://www.easyhits4u.com/logon/", wait_until="domcontentloaded")
     await page.wait_for_timeout(3000)
+    
+    # Chiudi overlay
+    logger.info("🔧 Rimozione overlay...")
+    await page.evaluate("""
+        document.querySelectorAll('.ReactModal__Overlay, .modal-overlay').forEach(el => {
+            el.style.display = 'none';
+        });
+    """)
     
     logger.info("📝 Compilazione form...")
     await page.fill('input[name="username"]', "sandrominori50+ulugarecexisa@gmail.com")
@@ -38,6 +47,7 @@ async def get_cookies_async():
     
     logger.info("⏳ Attesa redirect...")
     await page.wait_for_url(lambda url: "surf" in url, timeout=30000)
+    logger.info(f"✅ URL finale: {page.url}")
     
     logger.info("🍪 Estrazione cookie...")
     cookies = await page.context.cookies()
