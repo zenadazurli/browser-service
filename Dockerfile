@@ -1,5 +1,12 @@
 FROM python:3.11-slim
 
+RUN apt-get update && apt-get install -y \
+    chromium \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV CHROME_BIN=/usr/bin/chromium
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
 WORKDIR /app
 
 COPY requirements.txt .
