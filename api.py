@@ -1,73 +1,61 @@
 from fastapi import FastAPI
-import subprocess
-import time
-import re
+import asyncio
+import logging
+import sys
 import os
-import threading
+from browser_use import Browser
 
-API_KEY = os.environ.get("BROWSER_USE_API_KEY", "bu_MN6wlSbFKdRNKvxB349PKTYLjrHGjXGEt3DHrT91cD0")
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+logger = logging.getLogger(__name__)
+
 app = FastAPI()
 
-# Sessione globale (inizializzata una sola volta)
-session_initialized = False
-session_lock = threading.Lock()
+# Imposta la API key
+os.environ["BROWSER_USE_API_KEY"] = "bu_MN6wlSbFKdRNKvxB349PKTYLjrHGjXGEt3DHrT91cD0"
 
-def run_cmd(cmd, capture=False):
-    if capture:
-        return subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    else:
-        subprocess.run(cmd, shell=True)
-
-def init_session():
-    global session_initialized
-    with session_lock:
-        if not session_initialized:
-            print("🚀 Inizializzazione sessione cloud (una volta sola)...")
-            run_cmd("browser-use close --all")
-            run_cmd(f"browser-use cloud login {API_KEY}")
-            run_cmd("browser-use cloud connect")
-            run_cmd("browser-use open https://www.easyhits4u.com/logon/")
-            session_initialized = True
-            print("✅ Sessione cloud pronta e persistente")
+async def get_cookies_async():
+    logger.info("🚀 Avvio Browser Use SDK...")
+    
+    # Browser in modalità cloud
+    browser = Browser(
+        use_cloud=True,
+        headless=True,
+        proxy_country_code="it"
+    )
+    
+    page = await browser.get_page()
+    
+    logger.info("🌐 Navigazione...")
+    await page.goto("https://www.easyhits4u.com/logon/", wait_until="domcontentloaded")
+    await page.wait_for_timeout(3000)
+    
+    logger.info("📝 Compilazione form...")
+    await page.fill('input[name="username"]', "sandrominori50+ulugarecexisa@gmail.com")
+    await page.fill('input[name="password"]', "DDnmVV45!!")
+    
+    logger.info("🔑 Click login...")
+    await page.click('button.btn_green', force=True)
+    
+    logger.info("⏳ Attesa redirect...")
+    await page.wait_for_url(lambda url: "surf" in url, timeout=30000)
+    
+    logger.info("🍪 Estrazione cookie...")
+    cookies = await page.context.cookies()
+    await browser.close()
+    
+    sesids = next((c['value'] for c in cookies if c['name'] == 'sesids'), None)
+    user_id = next((c['value'] for c in cookies if c['name'] == 'user_id'), None)
+    
+    logger.info(f"🎉 Cookie: sesids={sesids}, user_id={user_id}")
+    return {"sesids": sesids, "user_id": user_id}
 
 @app.get("/cookies")
-def get_cookies():
-    print("🔐 Richiesta cookie...")
-    
-    # Inizializza la sessione (solo la prima volta)
-    init_session()
-    
-    # Ricompila il form (la sessione è già aperta)
-    run_cmd('browser-use keys "Tab"')
-    run_cmd('browser-use type "sandrominori50+ulugarecexisa@gmail.com"')
-    time.sleep(0.5)
-    
-    run_cmd('browser-use keys "Tab"')
-    run_cmd('browser-use type "DDnmVV45!!"')
-    time.sleep(0.5)
-    
-    # Tentativi di login
-    for tentativo in range(1, 4):
-        run_cmd('browser-use keys "Enter"')
-        time.sleep(5)
-        
-        result = run_cmd("browser-use eval 'window.location.href'", capture=True)
-        if "/surf/" in result.stdout:
-            print(f"✅ Login OK al tentativo {tentativo}")
-            break
-    
-    # Cookie
-    result = run_cmd("browser-use cookies get", capture=True)
-    
-    sesids_match = re.search(r"'sesids': '([^']+)'", result.stdout)
-    user_id_match = re.search(r"'user_id': '([^']+)'", result.stdout)
-    
-    sesids = sesids_match.group(1) if sesids_match else None
-    user_id = user_id_match.group(1) if user_id_match else None
-    
-    print(f"🍪 Cookie: sesids={sesids}, user_id={user_id}")
-    
-    return {"sesids": sesids, "user_id": user_id}
+async def get_cookies():
+    try:
+        return await get_cookies_async()
+    except Exception as e:
+        logger.error(f"❌ Errore: {e}")
+        return {"sesids": None, "user_id": None, "error": str(e)}
 
 @app.get("/health")
 def health():
