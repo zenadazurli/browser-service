@@ -1,5 +1,3 @@
 fastapi
 uvicorn
 browser-use
-langchain-openai
-playwright
