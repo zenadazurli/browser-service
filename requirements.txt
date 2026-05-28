@@ -1,4 +1,3 @@
 fastapi
 uvicorn
-browser-use
 playwright
